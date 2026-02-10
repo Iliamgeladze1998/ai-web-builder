@@ -3,26 +3,30 @@ const fs = require('fs');
 const path = require('path');
 
 const server = http.createServer((req, res) => {
-    // მთავარი გვერდი
+    // 1. საიტის მთავარი გვერდის გახსნა (GET)
     if (req.method === 'GET' && req.url === '/') {
         fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(data);
         });
     } 
-    // AI მოთხოვნის დამუშავება
+    // 2. ღილაკზე დაჭერის დამუშავება (POST)
     else if (req.method === 'POST' && req.url === '/generate') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
-        req.on('end', async () => {
+        req.on('end', () => {
             const { prompt } = JSON.parse(body);
             
-            // აქ მოხდება GeoAI-სთან დაკავშირება. 
-            // დროებით დავუბრუნოთ "ხელოვნური" პასუხი გასატესტად:
-            const aiCode = `<button class="bg-red-500 p-4 rounded-full font-bold shadow-lg">შენი შექმნილი ღილაკი: ${prompt}</button>`;
+            // ჯერჯერობით ვაბრუნებთ ლამაზ "სატესტო" პასუხს კავშირის შესამოწმებლად
+            const mockResponse = {
+                code: `<div class="p-6 bg-blue-900/50 border border-blue-500 rounded-2xl text-center">
+                        <h2 class="text-xl font-bold text-blue-400 mb-2">თქვენი იდეა: ${prompt}</h2>
+                        <p class="text-white italic text-sm">კავშირი დამყარებულია! საიტი მზადაა AI-სთვის. 🚀</p>
+                       </div>`
+            };
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ code: aiCode }));
+            res.end(JSON.stringify(mockResponse));
         });
     }
 });
