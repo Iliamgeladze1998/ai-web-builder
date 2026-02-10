@@ -1,1 +1,43 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoAI Playground</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white font-sans flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="max-w-2xl w-full">
+        <h1 class="text-4xl font-black text-center mb-8 text-blue-500 italic uppercase tracking-tighter">GeoAI Playground</h1>
+        
+        <div id="playground-area" class="w-full min-h-[250px] bg-gray-900 border-2 border-dashed border-gray-700 rounded-3xl flex items-center justify-center mb-8 transition-all duration-500">
+            <p class="text-gray-500 uppercase text-sm tracking-widest">აქ გაცოცხლდება შენი იდეები...</p>
+        </div>
+
+        <div class="bg-gray-800 p-4 rounded-2xl border border-gray-700 shadow-2xl">
+            <div class="flex gap-2">
+                <input id="user-prompt" type="text" placeholder="მაგ: შექმენი მანათობელი ღილაკი..." 
+                       class="flex-1 bg-gray-900 border border-gray-600 p-3 rounded-xl focus:outline-none focus:border-blue-500 transition-all text-white">
+                <button onclick="sendToAI()" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl font-bold transition-all active:scale-95">
+                    შექმნა
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function sendToAI() {
+            const prompt = document.getElementById('user-prompt').value;
+            const area = document.getElementById('playground-area');
+            if(!prompt) return;
+
+            area.innerHTML = "<div class='animate-pulse text-blue-400'>GeoAI ფიქრობს... 🧠</div>";
+            
+            setTimeout(() => {
+                area.innerHTML = "<div class='p-4 bg-white text-black rounded-lg font-bold shadow-lg uppercase italic'>საიტი ჩაირთო! 🚀</div>";
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
 
