@@ -26,10 +26,10 @@ const server = http.createServer((req, res) => {
                 contents: [{ parts: [{ text: `შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ HTML/CSS კოდი Tailwind-ით. მოთხოვნა: ${prompt}` }] }]
             });
 
-            // მისამართი შეცვლილია v1-ზე სტაბილურობისთვის
+            // ვიყენებთ v1beta-ს და gemini-1.5-flash-ს, რომელიც ყველაზე სწრაფია
             const options = {
                 hostname: 'generativelanguage.googleapis.com',
-                path: `/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             };
@@ -47,6 +47,7 @@ const server = http.createServer((req, res) => {
 
                     if (json.candidates && json.candidates[0]) {
                         let aiCode = json.candidates[0].content.parts[0].text;
+                        // ვასუფთავებთ კოდს Markdown-ისგან
                         aiCode = aiCode.replace(/```html|```css|```/g, "").trim();
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ code: aiCode }));
