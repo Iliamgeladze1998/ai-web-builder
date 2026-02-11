@@ -4,31 +4,21 @@ const path = require('path');
 const https = require('https');
 
 const server = http.createServer((req, res) => {
-    if (req.method === 'GET' && req.url === '/') {
+    if (req.method === 'GET') {
         fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(data);
         });
-    } 
-    else if (req.method === 'POST' && req.url === '/generate') {
+    } else if (req.method === 'POST') {
         let body = '';
-        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('data', chunk => { body += chunk; });
         req.on('end', () => {
             const { prompt } = JSON.parse(body);
             const apiKey = process.env.GROQ_API_KEY;
 
-            if (!apiKey) {
-                res.writeHead(500);
-                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: GROQ_API_KEY ვერ მოიძებნა Koyeb-ზე.</p>" }));
-            }
-
             const postData = JSON.stringify({
                 model: "llama-3.3-70b-versatile",
-                messages: [
-                    { role: "system", content: "შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ სუფთა HTML და CSS კოდი (Tailwind). არავითარი ტექსტი და განმარტება." },
-                    { role: "user", content: prompt }
-                ],
-                temperature: 0.7
+                messages: [{ role: "user", content: prompt + ". Return only HTML/Tailwind." }]
             });
 
             const options = {
@@ -42,35 +32,26 @@ const server = http.createServer((req, res) => {
             };
 
             const apiReq = https.request(options, (apiRes) => {
-                let responseData = '';
-                apiRes.on('data', d => { responseData += d; });
+                let data = '';
+                apiRes.on('data', d => { data += d; });
                 apiRes.on('end', () => {
+                    // აქ არის მთავარი - ნებისმიერ პასუხს ვაბრუნებთ ეკრანზე
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
                     try {
-                        const json = JSON.parse(responseData);
-                        if (json.choices && json.choices[0]) {
-                            let aiCode = json.choices[0].message.content;
-                            // კოდის გასუფთავება Markdown-ისგან
-                            aiCode = aiCode.replace(/```html|```css|```/g, "").trim();
-                            res.writeHead(200, { 'Content-Type': 'application/json' });
-                            res.end(JSON.stringify({ code: aiCode }));
-                        } else {
-                            throw new Error("API Error");
-                        }
-                    } catch (e) {
-                        res.writeHead(500);
-                        res.end(JSON.stringify({ code: "<p class='text-red-500'>AI-მ პასუხი ვერ გასცა. სცადეთ ისევ.</p>" }));
+                        const json = JSON.parse(data);
+                        const aiResult = json.choices ? json.choices[0].message.content : JSON.stringify(json);
+                        res.end(JSON.stringify({ code: aiResult }));
+                    } catch(e) {
+                        res.end(JSON.stringify({ code: "Raw API Response: " + data }));
                     }
                 });
             });
 
-            apiReq.on('error', (e) => {
-                res.end(JSON.stringify({ code: "<p class='text-red-500'>კავშირის შეცდომა.</p>" }));
-            });
+            apiReq.on('error', (e) => { res.end(JSON.stringify({ code: "Connection Error: " + e.message })); });
             apiReq.write(postData);
             apiReq.end();
         });
     }
 });
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT);
+server.listen(process.env.PORT || 8080);
