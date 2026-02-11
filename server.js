@@ -18,12 +18,15 @@ const server = http.createServer((req, res) => {
 
             const postData = JSON.stringify({
                 model: "llama-3.3-70b-versatile",
-                messages: [{ role: "user", content: prompt + ". Return only HTML/Tailwind." }]
+                messages: [
+                    { role: "system", content: "You are a web developer. Return ONLY HTML and Tailwind CSS code." },
+                    { role: "user", content: prompt }
+                ]
             });
 
             const options = {
                 hostname: 'api.groq.com',
-                path: '/v1/chat/completions',
+                path: '/openai/v1/chat/completions', // აქ დაემატა /openai/
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
@@ -35,19 +38,22 @@ const server = http.createServer((req, res) => {
                 let data = '';
                 apiRes.on('data', d => { data += d; });
                 apiRes.on('end', () => {
-                    // აქ არის მთავარი - ნებისმიერ პასუხს ვაბრუნებთ ეკრანზე
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     try {
                         const json = JSON.parse(data);
-                        const aiResult = json.choices ? json.choices[0].message.content : JSON.stringify(json);
-                        res.end(JSON.stringify({ code: aiResult }));
+                        if (json.choices && json.choices[0]) {
+                            let aiCode = json.choices[0].message.content;
+                            aiCode = aiCode.replace(/```html|```css|```/g, "").trim();
+                            res.end(JSON.stringify({ code: aiCode }));
+                        } else {
+                            res.end(JSON.stringify({ code: "<p class='text-red-500'>API Error: " + (json.error ? json.error.message : "Unknown") + "</p>" }));
+                        }
                     } catch(e) {
-                        res.end(JSON.stringify({ code: "Raw API Response: " + data }));
+                        res.end(JSON.stringify({ code: "Error parsing response" }));
                     }
                 });
             });
 
-            apiReq.on('error', (e) => { res.end(JSON.stringify({ code: "Connection Error: " + e.message })); });
             apiReq.write(postData);
             apiReq.end();
         });
