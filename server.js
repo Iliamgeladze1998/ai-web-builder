@@ -14,28 +14,25 @@ const server = http.createServer((req, res) => {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', async () => {
-            const { prompt } = JSON.parse(body);
-            const token = process.env.HF_TOKEN;
+            try {
+                const { prompt } = JSON.parse(body);
+                const token = process.env.HF_TOKEN;
 
-            if (!token) {
-                res.writeHead(500);
-                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: HF_TOKEN ვერ მოიძებნა.</p>" }));
-            }
+                if (!token) {
+                    res.writeHead(500);
+                    return res.end(JSON.stringify({ code: "<p class='text-red-500'>Error: HF_TOKEN missing in Koyeb!</p>" }));
+                }
 
-            async function queryAI(retryCount = 0) {
                 const postData = JSON.stringify({
-                    inputs: `<|begin_of_text|><|start_header_id|>system<|end_header_id|>შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ სუფთა HTML და CSS კოდი (Tailwind). არ დაწერო ტექსტი.<|eot_id|><|start_header_id|>user<|end_header_id|>${prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>`,
-                    parameters: { max_new_tokens: 1500, return_full_text: false }
+                    inputs: `Clean HTML/CSS code with Tailwind for: ${prompt}. Return ONLY code, no text.`,
+                    parameters: { max_new_tokens: 1500 }
                 });
 
                 const options = {
                     hostname: 'api-inference.huggingface.co',
-                    path: '/models/meta-llama/Llama-3.1-8B-Instruct',
+                    path: '/models/Qwen/Qwen2.5-Coder-32B-Instruct', // ყველაზე სწრაფი მოდელი კოდისთვის
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 };
 
                 const apiReq = https.request(options, (apiRes) => {
@@ -45,9 +42,10 @@ const server = http.createServer((req, res) => {
                         try {
                             const json = JSON.parse(responseData);
                             
-                            if (json.error && json.error.includes("loading") && retryCount < 5) {
-                                // თუ მოდელი ჯერ კიდევ იტვირთება, 5 წამში ისევ ვცდით
-                                return setTimeout(() => queryAI(retryCount + 1), 5000);
+                            // თუ მოდელი იტვირთება, მომხმარებელს ვეუბნებით
+                            if (json.error && json.error.includes("loading")) {
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                return res.end(JSON.stringify({ code: "<p class='text-blue-500'>AI 'იღვიძებს'... სცადეთ ისევ 5 წამში.</p>" }));
                             }
 
                             if (Array.isArray(json) && json[0].generated_text) {
@@ -56,22 +54,18 @@ const server = http.createServer((req, res) => {
                                 res.writeHead(200, { 'Content-Type': 'application/json' });
                                 res.end(JSON.stringify({ code: aiCode }));
                             } else {
-                                throw new Error("Invalid response structure");
+                                throw new Error("API error");
                             }
                         } catch (e) {
-                            res.writeHead(500);
-                            res.end(JSON.stringify({ code: "<p class='text-red-500'>AI-მ ვერ უპასუხა. სცადეთ ისევ 10 წამში.</p>" }));
+                            res.end(JSON.stringify({ code: "<p class='text-red-500'>AI დაკავებულია. სცადეთ ისევ.</p>" }));
                         }
                     });
                 });
-
-                apiReq.on('error', (e) => {
-                    res.end(JSON.stringify({ code: "<p class='text-red-500'>კავშირის შეცდომა</p>" }));
-                });
                 apiReq.write(postData);
                 apiReq.end();
+            } catch (err) {
+                res.end(JSON.stringify({ code: "Error" }));
             }
-            queryAI();
         });
     }
 });
