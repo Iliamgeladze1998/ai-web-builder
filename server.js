@@ -19,16 +19,17 @@ const server = http.createServer((req, res) => {
 
             if (!apiKey) {
                 res.writeHead(500);
-                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: API Key არ არის მითითებული Koyeb-ზე!</p>" }));
+                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: API Key ვერ მოიძებნა.</p>" }));
             }
 
             const postData = JSON.stringify({
                 contents: [{ parts: [{ text: `შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ HTML/CSS კოდი Tailwind-ით. მოთხოვნა: ${prompt}` }] }]
             });
 
+            // მისამართი შეცვლილია v1-ზე სტაბილურობისთვის
             const options = {
                 hostname: 'generativelanguage.googleapis.com',
-                path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                path: `/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             };
@@ -39,7 +40,6 @@ const server = http.createServer((req, res) => {
                 apiRes.on('end', () => {
                     const json = JSON.parse(responseData);
                     
-                    // თუ შეცდომაა, პირდაპირ ეკრანზე ვაჩვენებთ
                     if (json.error) {
                         res.writeHead(500);
                         return res.end(JSON.stringify({ code: `<div class='text-red-500 p-2'><b>Gemini Error:</b> ${json.error.message}</div>` }));
@@ -52,14 +52,13 @@ const server = http.createServer((req, res) => {
                         res.end(JSON.stringify({ code: aiCode }));
                     } else {
                         res.writeHead(500);
-                        // თუ პასუხი ცარიელია, ვაჩვენებთ რას გვიბრუნებს AI
-                        res.end(JSON.stringify({ code: `<p class='text-red-500'>AI-მ პასუხი ვერ გასცა. პასუხის სტატუსი: ${JSON.stringify(json.promptFeedback || "უცნობია")}</p>` }));
+                        res.end(JSON.stringify({ code: "<p class='text-red-500'>AI-მ პასუხი ვერ გასცა. სცადეთ სხვა პრომპტი.</p>" }));
                     }
                 });
             });
 
             apiReq.on('error', (e) => {
-                res.end(JSON.stringify({ code: `<p class='text-red-500'>კავშირის შეცდომა: ${e.message}</p>` }));
+                res.end(JSON.stringify({ code: `<p class='text-red-500'>კავშირის შეცდომა</p>` }));
             });
             apiReq.write(postData);
             apiReq.end();
