@@ -13,25 +13,32 @@ const server = http.createServer((req, res) => {
     else if (req.method === 'POST' && req.url === '/generate') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
-        req.on('end', async () => {
+        req.on('end', () => {
             const { prompt } = JSON.parse(body);
-            const token = process.env.HF_TOKEN;
+            const apiKey = process.env.GROQ_API_KEY;
 
-            if (!token) {
+            if (!apiKey) {
                 res.writeHead(500);
-                return res.end(JSON.stringify({ code: "<p class='text-red-500'>Error: HF_TOKEN missing!</p>" }));
+                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: GROQ_API_KEY ვერ მოიძებნა Koyeb-ზე.</p>" }));
             }
 
             const postData = JSON.stringify({
-                inputs: `Task: Create high-quality HTML/Tailwind CSS code for: ${prompt}. Return code only.`,
-                parameters: { max_new_tokens: 1500, return_full_text: false }
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    { role: "system", content: "შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ სუფთა HTML და CSS კოდი (Tailwind). არავითარი ტექსტი და განმარტება." },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7
             });
 
             const options = {
-                hostname: 'api-inference.huggingface.co',
-                path: '/models/Qwen/Qwen2.5-Coder-7B-Instruct', // შეცვლილია უფრო სწრაფ მოდელზე
+                hostname: 'api.groq.com',
+                path: '/v1/chat/completions',
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                }
             };
 
             const apiReq = https.request(options, (apiRes) => {
@@ -40,27 +47,25 @@ const server = http.createServer((req, res) => {
                 apiRes.on('end', () => {
                     try {
                         const json = JSON.parse(responseData);
-                        
-                        if (json.error && json.error.includes("loading")) {
-                            res.writeHead(200, { 'Content-Type': 'application/json' });
-                            return res.end(JSON.stringify({ code: "<p class='text-blue-500'>AI იტვირთება... სცადეთ ისევ 5 წამში.</p>" }));
-                        }
-
-                        if (Array.isArray(json) && json[0].generated_text) {
-                            let aiCode = json[0].generated_text;
+                        if (json.choices && json.choices[0]) {
+                            let aiCode = json.choices[0].message.content;
+                            // კოდის გასუფთავება Markdown-ისგან
                             aiCode = aiCode.replace(/```html|```css|```/g, "").trim();
                             res.writeHead(200, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify({ code: aiCode }));
                         } else {
-                            throw new Error();
+                            throw new Error("API Error");
                         }
                     } catch (e) {
                         res.writeHead(500);
-                        res.end(JSON.stringify({ code: "<p class='text-red-500'>AI დაკავებულია. კიდევ ერთხელ დააჭირეთ ღილაკს.</p>" }));
+                        res.end(JSON.stringify({ code: "<p class='text-red-500'>AI-მ პასუხი ვერ გასცა. სცადეთ ისევ.</p>" }));
                     }
                 });
             });
 
+            apiReq.on('error', (e) => {
+                res.end(JSON.stringify({ code: "<p class='text-red-500'>კავშირის შეცდომა.</p>" }));
+            });
             apiReq.write(postData);
             apiReq.end();
         });
