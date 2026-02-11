@@ -15,14 +15,15 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', () => {
             const { prompt } = JSON.parse(body);
-            const apiKey = process.env.GEMINI_API_KEY; // Koyeb-იდან წაიღებს გასაღებს
+            const apiKey = process.env.GEMINI_API_KEY;
+
+            if (!apiKey) {
+                res.writeHead(500);
+                return res.end(JSON.stringify({ code: "<p class='text-red-500'>შეცდომა: API Key არ არის მითითებული Koyeb-ზე!</p>" }));
+            }
 
             const postData = JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `შენ ხარ ექსპერტი ვებ-დეველოპერი. შექმენი მხოლოდ HTML და CSS კოდი (Tailwind CSS-ის გამოყენებით) მომხმარებლის მოთხოვნისთვის. დააბრუნე მხოლოდ სუფთა კოდი, ყოველგვარი ტექსტის გარეშე. მოთხოვნა: ${prompt}`
-                    }]
-                }]
+                contents: [{ parts: [{ text: `შენ ხარ ვებ-დეველოპერი. დააბრუნე მხოლოდ HTML/CSS კოდი Tailwind-ით. მოთხოვნა: ${prompt}` }] }]
             });
 
             const options = {
@@ -37,25 +38,29 @@ const server = http.createServer((req, res) => {
                 apiRes.on('data', d => { responseData += d; });
                 apiRes.on('end', () => {
                     const json = JSON.parse(responseData);
+                    
+                    // თუ შეცდომაა, პირდაპირ ეკრანზე ვაჩვენებთ
+                    if (json.error) {
+                        res.writeHead(500);
+                        return res.end(JSON.stringify({ code: `<div class='text-red-500 p-2'><b>Gemini Error:</b> ${json.error.message}</div>` }));
+                    }
+
                     if (json.candidates && json.candidates[0]) {
                         let aiCode = json.candidates[0].content.parts[0].text;
-                        // Markdown-ის სიმბოლოების მოცილება (თუ AI-მ ჩაამატა)
                         aiCode = aiCode.replace(/```html|```css|```/g, "").trim();
-                        
                         res.writeHead(200, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ code: aiCode }));
                     } else {
                         res.writeHead(500);
-                        res.end(JSON.stringify({ code: "<p class='text-red-500'>AI-მ პასუხი ვერ გასცა.</p>" }));
+                        // თუ პასუხი ცარიელია, ვაჩვენებთ რას გვიბრუნებს AI
+                        res.end(JSON.stringify({ code: `<p class='text-red-500'>AI-მ პასუხი ვერ გასცა. პასუხის სტატუსი: ${JSON.stringify(json.promptFeedback || "უცნობია")}</p>` }));
                     }
                 });
             });
 
             apiReq.on('error', (e) => {
-                res.writeHead(500);
-                res.end(JSON.stringify({ error: "კავშირის შეცდომა" }));
+                res.end(JSON.stringify({ code: `<p class='text-red-500'>კავშირის შეცდომა: ${e.message}</p>` }));
             });
-
             apiReq.write(postData);
             apiReq.end();
         });
